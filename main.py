@@ -7,7 +7,7 @@ from fastapi_utils.tasks import repeat_every
 from starlette.responses import RedirectResponse
 
 import sockets
-from server import app, kaspad_client
+from server import app, htnd_client
 from sockets import blocks
 from sockets.blockdag import periodical_blockdag
 from sockets.bluescore import periodical_blue_score
@@ -23,8 +23,8 @@ BLOCKS_TASK = None  # type: Task
 @app.on_event("startup")
 async def startup():
     global BLOCKS_TASK
-    # find kaspad before staring webserver
-    await kaspad_client.initialize_all()
+    # find htnd before staring webserver
+    await htnd_client.initialize_all()
     BLOCKS_TASK = asyncio.create_task(blocks.config())
 
 
@@ -39,8 +39,8 @@ async def watchdog():
         pass
     else:
         print(f"Watch found an error! {exception}\n"
-              f"Reinitialize kaspads and start task again")
-        await kaspad_client.initialize_all()
+              f"Reinitialize htnds and start task again")
+        await htnd_client.initialize_all()
         BLOCKS_TASK = asyncio.create_task(blocks.config())
 
 
