@@ -2,7 +2,7 @@ FROM python:3.10-alpine
 
 ARG REPO_DIR
 
-EXPOSE 8000
+EXPOSE 8001
 
 ENV HTND_HOST_1=n.seeder1.kaspad.net:16110
 ENV SQL_URI=postgresql+asyncpg://postgres:password@postgresql:5432/postgres
@@ -33,4 +33,4 @@ RUN pipenv install --deploy
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-CMD pipenv run gunicorn -b 0.0.0.0:8000 -w 1 -k uvicorn.workers.UvicornWorker main:app --timeout 120
+CMD pipenv run gunicorn -b 0.0.0.0:8001 -w 1 -k uvicorn.workers.UvicornWorker main:app --timeout 120
