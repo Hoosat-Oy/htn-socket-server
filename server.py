@@ -10,14 +10,14 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from htnd.KaspadMultiClient import KaspadMultiClient
+from htnd.HtndMultiClient import HtndMultiClient
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=[])
 socket_app = socketio.ASGIApp(sio)
 
 app = FastAPI(
-    title="Kaspa REST-API server",
-    description="This server is to communicate with kaspa network via REST-API",
+    title="Htnd REST-API server",
+    description="This server is to communicate with hoosat network via REST-API",
     version=os.getenv("VERSION", "tbd"),
     contact={
         "name": "lAmeR1"
@@ -79,7 +79,7 @@ for i in range(100):
 if not htnd_hosts:
     raise Exception('Please set at least HTND_HOST_1 environment variable.')
 
-htnd_client = KaspadMultiClient(htnd_hosts)
+htnd_client = HtndMultiClient(htnd_hosts)
 
 
 @app.exception_handler(Exception)
