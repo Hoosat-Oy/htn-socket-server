@@ -58,7 +58,7 @@ class HtndThread(object):
                     self.__queue.put_nowait("done")
                     return json_format.MessageToDict(resp)
             except grpc.aio._call.AioRpcError as e:
-                raise KaspadCommunicationError(str(e))
+                raise HtndCommunicationError(str(e))
 
     async def notify(self, command, params=None, callback_func=None):
         try:
@@ -70,7 +70,7 @@ class HtndThread(object):
             print("loop done...")
 
         except (grpc.aio._call.AioRpcError, _MultiThreadedRendezvous) as e:
-            raise KaspadCommunicationError(str(e))
+            raise HtndCommunicationError(str(e))
 
     async def yield_cmd(self, cmd, params=None):
         msg = KaspadMessage()

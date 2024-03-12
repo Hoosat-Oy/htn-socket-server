@@ -25,7 +25,7 @@ class HtndMultiClient(object):
     async def request(self, command, params=None, timeout=5):
         try:
             return await self.__get_htnd().request(command, params, timeout=timeout)
-        except KaspadCommunicationError:
+        except HtndCommunicationError:
             await self.initialize_all()
             return await self.__get_htnd().request(command, params, timeout=timeout)
 
