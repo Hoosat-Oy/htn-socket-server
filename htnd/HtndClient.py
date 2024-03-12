@@ -27,9 +27,9 @@ class HtndClient(object):
             return False
 
     async def request(self, command, params=None, timeout=5):
-        with KaspadThread(self.htnd_host, self.htnd_port) as t:
+        with HtndThread(self.htnd_host, self.htnd_port) as t:
             return await t.request(command, params, wait_for_response=True, timeout=timeout)
 
     async def notify(self, command, params, callback):
-        t = KaspadThread(self.htnd_host, self.htnd_port, async_thread=True)
+        t = HtndThread(self.htnd_host, self.htnd_port, async_thread=True)
         return await t.notify(command, params, callback)
