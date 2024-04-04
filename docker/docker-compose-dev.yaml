@@ -21,7 +21,7 @@ services:
     volumes:
       - "../:/app"
     environment:
-      HTND_HOST_1: kaspad:16110
+      HTND_HOST_1: kaspad:42420
       SQL_URI: postgresql+asyncpg://postgres:postgres@postgresql:5432/postgres
     ports:
       - "8000:8000/tcp"
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
     environment:
       DEBUG: "true"
-      HTND_HOST_1: kaspad:16110
+      HTND_HOST_1: kaspad:42420
       SQL_URI: postgresql://postgres:postgres@postgresql:5432/postgres
     links:
       - kaspad
@@ -59,7 +59,7 @@ services:
     image: supertypo/kaspad:latest
     restart: unless-stopped
     ports:
-      - "16110:16110/tcp"
+      - "42420:42420/tcp"
       - "16111:16111/tcp"
     volumes:
       - kaspad:/app/data/
