@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 
 from htnd.HtndMultiClient import HtndMultiClient
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=[])
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio)
 
 app = FastAPI(
