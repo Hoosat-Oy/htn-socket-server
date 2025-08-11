@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 from server import htnd_client, sio
-
 BLOCKS_CACHE = []
 TASKS = []
 
@@ -14,7 +13,6 @@ async def config():
             return
 
         global BLOCKS_CACHE
-
         emit_info = {
             'block_hash': block_info["verboseData"]["hash"],
             'difficulty': block_info["verboseData"]["difficulty"],
