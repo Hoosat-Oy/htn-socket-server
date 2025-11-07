@@ -5,9 +5,6 @@ from htnd.HtndClient import HtndClient
 # pipenv run python -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/rpc.proto ./protos/messages.proto ./protos/p2p.proto
 from htnd.HtndThread import HtndCommunicationError
 
-class NodeNotIndexedError(Exception):
-    """Custom exception indicating the node's UTXO is not indexed."""
-    pass
 
 class HtndMultiClient(object):
     def __init__(self, hosts: list[str]):
@@ -24,25 +21,19 @@ class HtndMultiClient(object):
         for t in tasks:
             await t
 
+    async def __request(self, command, params=None, timeout=30):
+        htnd = self.__get_htnd()
+        if htnd is not None: 
+            return await htnd.request(command, params, timeout=timeout)
 
-    async def request(self, command, params=None, timeout=5):
+    async def request(self, command, params=None, timeout=30):
         try:
-            htnd = self.__get_htnd()
-            if htnd is not None:
-                return await htnd.request(command, params, timeout=timeout)
-            else:
-                raise NodeNotIndexedError("Did not find a node that hash UTXO indexed")
+            return await self.__request(command, params, timeout=timeout)
         except HtndCommunicationError:
             await self.initialize_all()
-            htnd = self.__get_htnd()
-            if htnd is not None:
-                return await htnd.request(command, params, timeout=timeout)
-            else:
-                raise NodeNotIndexedError("Did not find a node that hash UTXO indexed")
+            return await self.__request(command, params, timeout=timeout)
 
     async def notify(self, command, params, callback):
         htnd = self.__get_htnd()
-        if htnd is not None:
-            return await htnd.notify(command, params, callback)
-        else:
-            raise NodeNotIndexedError("Did not find a node that hash UTXO indexed")
+        if htnd is not None: 
+            return self.notify(command, params, callback)

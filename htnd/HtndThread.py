@@ -1,6 +1,8 @@
 # encoding: utf-8
 import asyncio
+import logging
 from queue import Queue
+import time
 
 import grpc
 from google.protobuf import json_format
@@ -9,9 +11,10 @@ from grpc._channel import _MultiThreadedRendezvous
 from . import messages_pb2_grpc
 from .messages_pb2 import KaspadMessage
 
-
 MAX_MESSAGE_LENGTH = 1024 * 1024 * 1024  # 1GB
 
+
+_logger = logging.getLogger(__name__)
 
 class HtndCommunicationError(Exception): pass
 
@@ -51,12 +54,17 @@ class HtndThread(object):
     def __exit__(self, *args):
         self.__closing = True
 
-    async def request(self, command, params=None, wait_for_response=True, timeout=120):
+    async def request(self, command, params=None, wait_for_response=False, timeout=10):
         if wait_for_response:
             try:
-                async for resp in self.stub.MessageStream(self.yield_cmd(command, params), timeout=120):
+                async for resp in self.stub.MessageStream(self.yield_cmd(command, params), timeout=timeout):
                     self.__queue.put_nowait("done")
                     return json_format.MessageToDict(resp)
+            except grpc.aio._call.AioRpcError as e:
+                raise HtndCommunicationError(str(e))
+        else:
+            try:
+                await self.stub.MessageStream(self.yield_cmd(command, params), timeout=timeout)
             except grpc.aio._call.AioRpcError as e:
                 raise HtndCommunicationError(str(e))
 
@@ -66,8 +74,6 @@ class HtndThread(object):
                 # self.__queue.put_nowait("done")
                 if callback_func:
                     await callback_func(json_format.MessageToDict(resp))
-
-            print("loop done...")
 
         except (grpc.aio._call.AioRpcError, _MultiThreadedRendezvous) as e:
             raise HtndCommunicationError(str(e))
