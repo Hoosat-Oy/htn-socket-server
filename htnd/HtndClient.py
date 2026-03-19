@@ -32,7 +32,7 @@ class HtndClient(object):
 
     async def request(self, command, params=None, timeout=10):
         try:
-            with HtndThread(self.htnd_host, self.htnd_port) as t:
+            async with HtndThread(self.htnd_host, self.htnd_port) as t:
                 resp = await t.request(command, params, wait_for_response=True, timeout=timeout)
                 return resp
         except HtndCommunicationError:
