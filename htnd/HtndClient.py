@@ -41,5 +41,5 @@ class HtndClient(object):
             raise
 
     async def notify(self, command, params, callback):
-        t = HtndThread(self.htnd_host, self.htnd_port, async_thread=True)
-        return await t.notify(command, params, callback)
+        async with HtndThread(self.htnd_host, self.htnd_port, async_thread=True) as t:
+            return await t.notify(command, params, callback)

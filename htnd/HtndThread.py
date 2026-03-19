@@ -26,6 +26,7 @@ class HtndThread(object):
 
         self.htnd_host = htnd_host
         self.htnd_port = htnd_port
+        self.async_thread = async_thread
 
         if async_thread:
             self.channel = grpc.aio.insecure_channel(f'{htnd_host}:{htnd_port}',
@@ -38,9 +39,9 @@ class HtndThread(object):
             self.channel = grpc.insecure_channel(f'{htnd_host}:{htnd_port}',
                                                  compression=grpc.Compression.Gzip,
                                                  options=[
-                                                     ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
-                                                     ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
-                                                 ])
+                                                         ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+                                                         ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
+                                                     ])
             self.__sync_queue = Queue()
         self.stub = messages_pb2_grpc.RPCStub(self.channel)
 
@@ -48,29 +49,33 @@ class HtndThread(object):
 
         self.__closing = False
 
-    def __enter__(self, *args):
+    async def __aenter__(self):
         return self
 
-    def __exit__(self, *args):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.async_thread:
+            await self.channel.close()
+        else:
+            self.channel.close()
         self.__closing = True
 
     async def request(self, command, params=None, wait_for_response=False, timeout=10):
         if wait_for_response:
             try:
-                async for resp in self.stub.MessageStream(self.yield_cmd(command, params), timeout=timeout):
+                async for resp in self.stub.MessageStream(self.yield_cmd(command, params, streaming=False), timeout=timeout):
                     self.__queue.put_nowait("done")
                     return json_format.MessageToDict(resp)
             except grpc.aio._call.AioRpcError as e:
                 raise HtndCommunicationError(str(e))
         else:
             try:
-                await self.stub.MessageStream(self.yield_cmd(command, params), timeout=timeout)
+                await self.stub.MessageStream(self.yield_cmd(command, params, streaming=False), timeout=timeout)
             except grpc.aio._call.AioRpcError as e:
                 raise HtndCommunicationError(str(e))
 
     async def notify(self, command, params=None, callback_func=None):
         try:
-            async for resp in self.stub.MessageStream(self.yield_cmd(command, params)):
+            async for resp in self.stub.MessageStream(self.yield_cmd(command, params, streaming=True)):
                 # self.__queue.put_nowait("done")
                 if callback_func:
                     await callback_func(json_format.MessageToDict(resp))
@@ -78,7 +83,7 @@ class HtndThread(object):
         except (grpc.aio._call.AioRpcError, _MultiThreadedRendezvous) as e:
             raise HtndCommunicationError(str(e))
 
-    async def yield_cmd(self, cmd, params=None):
+    async def yield_cmd(self, cmd, params=None, streaming=False):
         msg = KaspadMessage()
         msg2 = getattr(msg, cmd)
         payload = params
@@ -91,7 +96,8 @@ class HtndThread(object):
 
         msg2.SetInParent()
         yield msg
-        await self.__queue.get()
+        if not streaming:
+            await self.__queue.get()
 
     def yield_cmd_sync(self, cmd, params=None):
         msg = KaspadMessage()
