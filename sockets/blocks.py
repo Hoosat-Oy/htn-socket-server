@@ -11,6 +11,21 @@ logger = logging.getLogger(__name__)
 async def config():
     logger.info("Starting block notification subscription")
 
+    def render_transactions(transactions):
+        rendered_transactions = []
+        for transaction in transactions[-20:]:
+            transaction_verbose_data = transaction.get("verboseData") or {}
+            outputs = transaction.get("outputs") or []
+            rendered_transactions.append({
+                'txId': transaction_verbose_data.get("transactionId"),
+                'outputs': [
+                    ((output.get("verboseData") or {}).get("scriptPublicKeyAddress"), output.get("amount"))
+                    for output in outputs[-20:]
+                ]
+            })
+
+        return rendered_transactions
+
     async def on_new_block(e):
         if "notifyBlockAddedResponse" in e:
             logger.info("Block notification subscription acknowledged")
@@ -26,23 +41,31 @@ async def config():
         verbose_data = block_info.get("verboseData") or {}
         transactions = block_info.get("transactions") or []
         transaction_ids = verbose_data.get("transactionIds") or []
+        block_hash = verbose_data.get("hash")
+
+        if not transactions and transaction_ids and block_hash:
+            logger.info(
+                "Hydrating transactions for block hash=%s using getBlockRequest",
+                block_hash,
+            )
+            try:
+                block_response = await htnd_client.request(
+                    "getBlockRequest",
+                    {
+                        "hash": block_hash,
+                        "includeTransactions": True,
+                    },
+                )
+                transactions = ((block_response or {}).get("getBlockResponse") or {}).get("block", {}).get("transactions") or []
+            except Exception:
+                logger.exception("Failed hydrating transactions for block hash=%s", block_hash)
 
         tx_count = len(transactions) if transactions else len(transaction_ids)
-        rendered_transactions = []
-        for transaction in transactions[-20:]:
-            transaction_verbose_data = transaction.get("verboseData") or {}
-            outputs = transaction.get("outputs") or []
-            rendered_transactions.append({
-                'txId': transaction_verbose_data.get("transactionId"),
-                'outputs': [
-                    ((output.get("verboseData") or {}).get("scriptPublicKeyAddress"), output.get("amount"))
-                    for output in outputs[-20:]
-                ]
-            })
+        rendered_transactions = render_transactions(transactions)
 
         global BLOCKS_CACHE
         emit_info = {
-            'block_hash': verbose_data.get("hash"),
+            'block_hash': block_hash,
             'difficulty': verbose_data.get("difficulty"),
             'blueScore': header.get("blueScore", verbose_data.get("blueScore")),
             'timestamp': header.get("timestamp"),
@@ -56,6 +79,11 @@ async def config():
             emit_info["blueScore"],
             emit_info["txCount"],
             verbose_data.get("isHeaderOnly"),
+        )
+        logger.info(
+            "Prepared block payload hash=%s rendered_txs=%s",
+            emit_info["block_hash"],
+            len(rendered_transactions),
         )
 
         BLOCKS_CACHE.append(emit_info)
