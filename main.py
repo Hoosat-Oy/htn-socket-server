@@ -1,5 +1,6 @@
 # encoding: utf-8
 import asyncio
+import logging
 import os
 from asyncio import Task, InvalidStateError
 from typing import Optional
@@ -14,9 +15,15 @@ from sockets.blockdag import periodical_blockdag
 from sockets.bluescore import periodical_blue_score
 from sockets.coinsupply import periodic_coin_supply
 
-print(
-    f"Loaded: {sockets.join_room}"
-    f"{periodic_coin_supply} {periodical_blockdag} {periodical_blue_score}")
+logger = logging.getLogger(__name__)
+
+logger.info(
+    "Loaded socket handlers: join_room=%s coinsupply=%s blockdag=%s bluescore=%s",
+    sockets.join_room,
+    periodic_coin_supply,
+    periodical_blockdag,
+    periodical_blue_score,
+)
 
 BLOCKS_TASK: Optional[Task] = None
 
@@ -25,8 +32,10 @@ async def start_blocks_task():
     global BLOCKS_TASK
 
     if BLOCKS_TASK is not None and not BLOCKS_TASK.done():
+        logger.debug("Blocks task already running")
         return BLOCKS_TASK
 
+    logger.info("Creating blocks subscription task")
     BLOCKS_TASK = asyncio.create_task(blocks.config())
     return BLOCKS_TASK
 
@@ -34,6 +43,7 @@ async def start_blocks_task():
 @app.on_event("startup")
 async def startup():
     # find htnd before staring webserver
+    logger.info("Server startup: initializing htnd clients")
     await htnd_client.initialize_all()
     await start_blocks_task()
 
@@ -44,6 +54,7 @@ async def watchdog():
     global BLOCKS_TASK
 
     if BLOCKS_TASK is None:
+        logger.warning("Watchdog found no block task; reinitializing htnds and starting one")
         await htnd_client.initialize_all()
         await start_blocks_task()
         return
@@ -51,9 +62,10 @@ async def watchdog():
     try:
         exception = BLOCKS_TASK.exception()
     except InvalidStateError:
+        logger.debug("Blocks task still running")
         return
     except asyncio.CancelledError:
-        print("Watch found cancelled block task. Reinitializing htnds and restarting task")
+        logger.warning("Watchdog found cancelled block task; reinitializing and restarting")
         await htnd_client.initialize_all()
         await start_blocks_task()
     else:
@@ -61,10 +73,12 @@ async def watchdog():
             return
 
         if exception is None:
-            print("Watch found completed block task. Reinitializing htnds and restarting task")
+            logger.warning("Watchdog found completed block task; restarting subscription")
         else:
-            print(f"Watch found an error! {exception}\n"
-                  f"Reinitialize htnds and start task again")
+            logger.error(
+                "Watchdog found block task error; reinitializing htnds and restarting",
+                exc_info=(type(exception), exception, exception.__traceback__),
+            )
 
         await htnd_client.initialize_all()
         await start_blocks_task()

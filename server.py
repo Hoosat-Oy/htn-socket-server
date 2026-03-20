@@ -1,4 +1,5 @@
 # encoding: utf-8
+import logging
 import os
 
 import socketio
@@ -11,6 +12,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from htnd.HtndMultiClient import HtndMultiClient
+
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=[])
 socket_app = socketio.ASGIApp(sio)
@@ -80,10 +89,12 @@ if not htnd_hosts:
     raise Exception('Please set at least HTND_HOSTS_1 environment variable.')
 
 htnd_client = HtndMultiClient(htnd_hosts)
+logger.info("Configured htnd hosts: %s", htnd_hosts)
 
 
 @app.exception_handler(Exception)
 async def unicorn_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception while serving %s %s", request.method, request.url.path, exc_info=exc)
     await htnd_client.initialize_all()
     return JSONResponse(
         status_code=500,
@@ -96,4 +107,5 @@ async def unicorn_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 @repeat_every(seconds=60)
 async def periodical_blockdag():
+    logger.debug("Refreshing htnd client state")
     await htnd_client.initialize_all()
