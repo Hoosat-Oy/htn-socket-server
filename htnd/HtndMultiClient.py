@@ -9,6 +9,7 @@ from htnd.HtndThread import HtndCommunicationError
 class HtndMultiClient(object):
     def __init__(self, hosts: list[str]):
         self.htnds = [HtndClient(*h.split(":")) for h in hosts]
+        self._initialize_lock = asyncio.Lock()
 
     def __get_htnd(self):
         for k in self.htnds:
@@ -16,15 +17,27 @@ class HtndMultiClient(object):
                 return k
 
     async def initialize_all(self):
-        tasks = [asyncio.create_task(k.ping()) for k in self.htnds]
+        async with self._initialize_lock:
+            tasks = [asyncio.create_task(k.ping()) for k in self.htnds]
 
-        for t in tasks:
-            await t
+            for t in tasks:
+                await t
+
+    async def _get_or_initialize_htnd(self):
+        htnd = self.__get_htnd()
+        if htnd is not None:
+            return htnd
+
+        await self.initialize_all()
+        htnd = self.__get_htnd()
+        if htnd is None:
+            raise HtndCommunicationError("No indexed htnd is available")
+
+        return htnd
 
     async def __request(self, command, params=None, timeout=30):
-        htnd = self.__get_htnd()
-        if htnd is not None: 
-            return await htnd.request(command, params, timeout=timeout)
+        htnd = await self._get_or_initialize_htnd()
+        return await htnd.request(command, params, timeout=timeout)
 
     async def request(self, command, params=None, timeout=30):
         try:
@@ -34,6 +47,10 @@ class HtndMultiClient(object):
             return await self.__request(command, params, timeout=timeout)
 
     async def notify(self, command, params, callback):
-        htnd = self.__get_htnd()
-        if htnd is not None: 
+        try:
+            htnd = await self._get_or_initialize_htnd()
+            await htnd.notify(command, params, callback)
+        except HtndCommunicationError:
+            await self.initialize_all()
+            htnd = await self._get_or_initialize_htnd()
             await htnd.notify(command, params, callback)
