@@ -75,7 +75,7 @@ class HtndThread(object):
 
     async def notify(self, command, params=None, callback_func=None):
         try:
-            async for resp in self.stub.MessageStream(self.yield_cmd(command, params, streaming=True)):
+            async for resp in self.stub.MessageStream(self.yield_cmd(command, params, streaming=False)):
                 # self.__queue.put_nowait("done")
                 if callback_func:
                     await callback_func(json_format.MessageToDict(resp))
